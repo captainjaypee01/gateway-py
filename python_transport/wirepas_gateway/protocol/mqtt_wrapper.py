@@ -44,6 +44,8 @@ class MQTTWrapper(Thread):
         # Variable to keep track of latest published packet
         self._timestamp_last_publish = datetime.now()
 
+        # settings.mqtt_use_websocket = True
+
         if settings.mqtt_use_websocket:
             transport = "websockets"
             self._use_websockets = True
@@ -56,6 +58,16 @@ class MQTTWrapper(Thread):
             clean_session=not settings.mqtt_persist_session,
             transport=transport,
         )
+        settings.mqtt_ca_certs = "/home/pi/wirepas/certs/ca.pem"
+        settings.mqtt_certfile = "/home/pi/wirepas/certs/client.pem"
+        settings.mqtt_keyfile = "/home/pi/wirepas/certs/clientkey.pem"
+
+        # print("FROM wrapper py")
+        # print(settings.gateway_id)
+        # print(settings.mqtt_persist_session)
+        # print(ssl.VerifyMode[settings.mqtt_cert_reqs])
+        # print(ssl._SSLMethod[settings.mqtt_tls_version])
+        # print(settings.mqtt_ciphers)
 
         if not settings.mqtt_force_unsecure:
             try:
@@ -71,6 +83,7 @@ class MQTTWrapper(Thread):
                 self.logger.error("Cannot use secure authentication %s", e)
                 exit(-1)
 
+        
         self.logger.info(
             "Max inflight messages set to %s", settings.mqtt_max_inflight_messages
         )
@@ -82,6 +95,13 @@ class MQTTWrapper(Thread):
 
         if last_will_topic is not None and last_will_data is not None:
             self._set_last_will(last_will_topic, last_will_data)
+        settings.mqtt_hostname = "www.lingjacksmart.com"
+        # settings.mqtt_hostname = "169.254.49.107"
+        settings.mqtt_port = 8883
+        # settings.mqtt_port = 1883
+
+        # settings.mqtt_hostname = "192.168.2.117"
+        # settings.mqtt_port = 6001
 
         try:
             self._client.connect(
