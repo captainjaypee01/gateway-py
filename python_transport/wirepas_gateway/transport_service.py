@@ -336,7 +336,7 @@ class TransportService(BusClient):
         data = str(data).replace("b'","").replace("'","")
        
         nodeid = str(hex(src)).replace("0x","")
-        dataStr = '{{"NetworkID":"{network}","NodeID":"{node}","System":{system},"EP"{ep}:,"Data":"{datapack}","Timestamp":{time},"Travel":{travel},"Hop":{hop}}}"'.format(
+        dataStr = '{{"NetworkID":"{network}","NodeID":"{node}","System":{system},"EP":{ep},"Data":"{datapack}","Timestamp":{time},"Travel":{travel},"Hop":{hop}}}"'.format(
                    network=network_address,
                    node=nodeid,
                    system=src_ep,
