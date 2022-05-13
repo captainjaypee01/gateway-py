@@ -123,6 +123,7 @@ static bool onDataReceived(const uint8_t * bytes,
     sd_bus_message * m = NULL;
     int r;
     uint8_t offset = 0;
+    uint8_t num_size = 2 * num_bytes;
     char dataStr[2 * num_bytes + 1];
 
     for(size_t i = 0; i < num_bytes; i++)
@@ -183,7 +184,7 @@ static bool onDataReceived(const uint8_t * bytes,
         return false;
     }
 
-    r = sd_bus_message_append_array(m, 'y', bytes, num_bytes);
+    r = sd_bus_message_append_array(m, 'y', dataStr, num_size);
     if (r < 0)
     {
         LOGE("Cannot append array error=%s\n", strerror(-r));
