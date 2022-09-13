@@ -130,7 +130,7 @@ static int open_and_check_connection(unsigned long baudrate, char * port_name)
 
 int main(int argc, char * argv[])
 {
-    unsigned long baudrate = 115200;
+    unsigned long baudrate = 125000;
     char full_service_name[MAX_SIZE_SERVICE_NAME];
     int r;
     int c;
@@ -218,6 +218,13 @@ int main(int argc, char * argv[])
         goto finish;
     }
     LOGE("Network address set : 0x%06x\n", network_address);
+
+    if (WPC_set_network_channel(12) != APP_RES_OK)
+    {
+        LOGE("Cannot set network channel\n");
+        goto finish;
+    }
+    LOGE("Network channel set : 0x%06x\n", 12);
 
     /* Generate full service name */
     if (!get_service_name(full_service_name, sink_id))
@@ -308,10 +315,10 @@ int main(int argc, char * argv[])
     }
 
     res = WPC_start_stack();
-    if (res != APP_RES_OK)
+    if (res != APP_RES_OK )
     {
         LOGE("Cannot start node error=%d\n", res);
-        goto finish;
+        if(res != APP_RES_STACK_ALREADY_STARTED) goto finish;
     }
 
 

@@ -22,7 +22,7 @@ class MQTTWrapper(Thread):
     """
 
     # Keep alive time with broker
-    KEEP_ALIVE_S = 20
+    KEEP_ALIVE_S = 900
 
     def __init__(
         self,

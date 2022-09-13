@@ -4,6 +4,8 @@
 #
 import logging
 import os
+import json
+import random
 import wirepas_mesh_messaging as wmm
 from time import time, sleep
 from uuid import getnode
@@ -294,6 +296,11 @@ class TransportService(BusClient):
             topic, self._on_otap_set_target_scratchpad_request_received
         )
 
+        topic = 'gw-backend/send_data/+/+'
+        self.mqtt_wrapper.subscribe(
+            topic, self._on_backend_data_cmd_received
+        )
+
         self._set_status()
 
         self.logger.info("MQTT connected!")
@@ -329,6 +336,40 @@ class TransportService(BusClient):
             )
             return
 
+        network_address = sink.get_network_address()
+
+        event = wmm.ReceivedDataEvent(
+            event_id=self.data_event_id,
+            gw_id=self.gw_id,
+            sink_id=sink_id,
+            rx_time_ms_epoch=timestamp,
+            src=src,
+            dst=dst,
+            src_ep=src_ep,
+            dst_ep=dst_ep,
+            travel_time_ms=travel_time,
+            qos=qos,
+            data=data,
+            data_size=data_size,
+            hop_count=hop_count,
+            network_address=network_address,
+        )
+
+        topic = TopicGenerator.make_received_data_topic(
+            self.gw_id, sink_id, network_address, src_ep, dst_ep
+        )
+        self.logger.info("Uplink traffic: %s", topic)
+
+        # No need to protect data_event_id as on_data_received is always
+        # called from same thread
+        if self.data_event_id is not None:
+            self.data_event_id += 1
+
+        # Set qos to 1 to avoid loading too much the broker
+        # unique id in event header can be used for duplicate filtering in
+        # backends
+        self.mqtt_wrapper.publish(topic, event.payload, qos=1)
+        
         # if dst_ep != 5:
         #     return
         network_address = str(hex(sink.get_network_address())).replace("0x","")
@@ -347,67 +388,15 @@ class TransportService(BusClient):
                    hop=hop_count
                  )
         self.logger.info(dataStr)
-        # #self.logger.info(timestamp / 1000)
-        # ConvertTime = datetime.fromtimestamp(int(timestamp / 1000))
-        # #self.logger.info(ConvertTime)
-        # Resource_path = "Location"
-        # #self.logger.info(network_address)
-        # Gateway_Id = "WaterMeter-" + Resource_path + "-" + str(network_address)
-        # #self.logger.info(Gateway_Id)
-        # Sensor_Id = "WATERMETER-" + "LINGJACK-" + Resource_path + "-" + str(src)
-        # #self.logger.info(Sensor_Id)
-        # Event_Id = "EV-" + Resource_path + "-" + str(src) + "-" + str(ConvertTime).replace(":","").replace(" ","").replace("-","")
-        # Event_Type = "Water/sub-meter#reading"
-        # self.logger.info(type(data))
 
-        #self.logger.info(int(data,16))
-        #self.logger.info(int(data,2))
-        #self.logger.info("check point 1.1")
-        # dataStr = '{{"SenderId":"{SenderId}","SensorId":"{SensorId}","Resourcepath":{Resourcepath},"EventId":"{EventId}","EventType":"{EventType}","Parameters": {{"sensorstatus": "{sensorsstatus}","Time":"{ConvertTime}","Serverity":"{Severity}","WaterUsage":"{Data}"}} }}'
-        #             SenderId= Gateway_Id,
-        #             SensorId= Sensor_Id,
-        #             Resourcepath = Resource_path,
-        #             EventId= Event_Id,
-        #             EventType= Event_Type,
-        #             sensorstatus= "online",
-        #             Time= ConvertTime,
-        #             Severity=6,
-        #             Data= data
-        #         )
+        # topic = "gw-backend/received"
 
-        
-        # event = wmm.ReceivedDataEvent(
-        #     event_id=self.data_event_id,
-        #     gw_id=self.gw_id,
-        #     sink_id=sink_id,
-        #     rx_time_ms_epoch=timestamp,
-        #     src=src,
-        #     dst=dst,
-        #     src_ep=src_ep,
-        #     dst_ep=dst_ep,
-        #     travel_time_ms=travel_time,
-        #     qos=qos,
-        #     data=data,
-        #     data_size=data_size,
-        #     hop_count=hop_count,
-        #     network_address=network_address,
-        # )
+        # params = [str(self.gw_id), str(sink_id), str(network_address), str(src_ep), str(dst_ep)]
+        # for param in params:
+        #     topic += "/" + param
 
-        
-        topic = TopicGenerator.make_received_data_topic(
-            self.gw_id, sink_id, network_address, src_ep, dst_ep
-        )
-        self.logger.info("Uplink traffic: %s", topic)
-
-        # No need to protect data_event_id as on_data_received is always
-        # called from same thread
-        if self.data_event_id is not None:
-            self.data_event_id += 1
-
-        # Set qos to 1 to avoid loading too much the broker
-        # unique id in event header can be used for duplicate filtering in
-        # backends
-        self.mqtt_wrapper.publish(topic, dataStr, qos=1)
+        # self.logger.info("Uplink traffic: %s", topic)
+        # self.mqtt_wrapper.publish(topic, dataStr, qos=1)
 
     def on_stack_started(self, name):
         sink = self.sink_manager.get_sink(name)
@@ -481,7 +470,7 @@ class TransportService(BusClient):
 
     @deferred_thread
     def _on_send_data_cmd_received(self, client, userdata, message):
-        # pylint: disable=unused-argument
+
         try:
             request = wmm.SendDataRequest.from_payload(message.payload)
         except wmm.GatewayAPIParsingException as e:
@@ -489,6 +478,7 @@ class TransportService(BusClient):
             return
 
         # Get the sink-id from topic
+        self.logger.info(request)
         _, sink_id = TopicParser.parse_send_data_topic(message.topic)
 
         self.logger.debug("Downlink traffic: %s | %s", sink_id, request.req_id)
@@ -516,7 +506,6 @@ class TransportService(BusClient):
         # Answer to backend
         response = wmm.SendDataResponse(request.req_id, self.gw_id, res, sink_id)
         topic = TopicGenerator.make_send_data_response_topic(self.gw_id, sink_id)
-
         self.mqtt_wrapper.publish(topic, response.payload, qos=2)
 
     @deferred_thread
@@ -673,6 +662,7 @@ class TransportService(BusClient):
             self.gw_id, request.sink_id
         )
 
+        self.logger.info("TOPIC: %s | OTAP upload response res %s", topic, res)
         self.mqtt_wrapper.publish(topic, response.payload, qos=2)
 
     @deferred_thread
